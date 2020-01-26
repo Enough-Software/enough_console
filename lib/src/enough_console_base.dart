@@ -5,6 +5,7 @@ import 'package:console/console.dart' as cnsl;
 import 'package:enough_console/src/stack.dart';
 
 class Console {
+  static const String ANSI_ESCAPE = '\x1b[';
   int get numberOfRows => stdout.terminalLines;
   int get numberOfColumns => stdout.terminalColumns;
 
@@ -21,10 +22,33 @@ class Console {
 
   Console({bool reset = false}) {
     if (reset) {
-      cnsl.Console.resetAll();
-      cnsl.Console.eraseDisplay(1);
-      cnsl.Console.restoreCursor();
+      this.reset();
+    } else {
+      _currentLine = getCursorPosition().row;
     }
+  }
+
+  CursorPosition getCursorPosition() {
+    stdin.echoMode = false;
+    stdin.lineMode = false;
+    stdout.write('${ANSI_ESCAPE}6n');
+    var bytes = <int>[];
+    while (true) {
+      var byte = stdin.readByteSync();
+      bytes.add(byte);
+      if (byte == 82) {
+        break;
+      }
+    }
+    stdin.lineMode = true;
+    stdin.echoMode = true;
+    var str = String.fromCharCodes(bytes);
+    str = str.substring(str.lastIndexOf('[') + 1, str.length - 1);
+
+    var parts =
+        List<int>.from(str.split(';').map<int>((it) => int.parse(it))).toList();
+
+    return CursorPosition(parts[1], parts[0]);
   }
 
   void addLineMark() {
@@ -159,6 +183,17 @@ class Console {
     cnsl.Console.write(text);
   }
 
+  void writeBold(String text) {
+    setBold(true);
+    cnsl.Console.write(text);
+    setBold(false);
+  }
+
+  void writeln([String text = '']) {
+    stdout.writeln(text);
+    _currentLine++;
+  }
+
   void setBold([bool bold = true]) {
     cnsl.Console.setBold(bold);
   }
@@ -204,6 +239,7 @@ class Console {
     cnsl.Console.eraseDisplay(1);
     moveCursor(column: 1, row: 1);
     cnsl.Console.showCursor();
+    _currentLine = 1;
   }
 
   List<TextLine> wrap(String text, TextStyle style, [int terminalColumns]) {
@@ -460,6 +496,7 @@ class Progress {
 
   void start() {
     _console.hideCursor();
+    _isStopRequested = false;
     Timer.periodic(Duration(milliseconds: 200), _next);
     _current = 0;
     _write(_indicators[0]);
@@ -489,3 +526,12 @@ class Progress {
   }
 }
 
+class CursorPosition {
+  final int row;
+  final int column;
+
+  CursorPosition(this.column, this.row);
+
+  @override
+  String toString() => '($column, $row)';
+}
