@@ -1,6 +1,6 @@
 name: enough_console
 description: Experimental library for creating command line apps.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/Enough-Software/enough_console
 
 environment:
