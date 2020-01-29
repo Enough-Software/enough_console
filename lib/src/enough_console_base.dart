@@ -10,7 +10,6 @@ class Console {
   int get numberOfColumns => stdout.terminalColumns;
 
   final Stack<int> _lineMarks = Stack<int>();
-  int _currentLine = 1;
   Progress _progress;
 
   static const TextStyle _errorStyle =
@@ -23,8 +22,6 @@ class Console {
   Console({bool reset = false}) {
     if (reset) {
       this.reset();
-    } else {
-      _currentLine = getCursorPosition().row;
     }
   }
 
@@ -52,7 +49,7 @@ class Console {
   }
 
   void addLineMark() {
-    _lineMarks.put(_currentLine);
+    _lineMarks.put(getCursorPosition().row);
   }
 
   void returnToLineMark(
@@ -62,7 +59,7 @@ class Console {
     }
     var previousLine = _lineMarks.isEmpty ? 1 : _lineMarks.pop();
     if (returnToPreviousLine) {
-      var lines = previousLine - _currentLine;
+      var lines = previousLine - getCursorPosition().row;
 
       var gone = 0;
       if (lines < 0) {
@@ -80,11 +77,10 @@ class Console {
         }
         cnsl.Console.previousLine(lines);
       }
-      _currentLine = previousLine;
     }
   }
 
-  void moveToRow(VerticalAlignment vertical, int height) {
+  int moveToRow(VerticalAlignment vertical, int height) {
     int row;
     if (vertical == VerticalAlignment.top) {
       row = 1;
@@ -94,17 +90,15 @@ class Console {
       row = (numberOfRows - height) ~/ 2;
     }
     cnsl.Console.moveCursor(row: row);
-    _currentLine = row;
+    return row;
   }
 
   void nextLine([int count = 1]) {
     cnsl.Console.nextLine(count);
-    _currentLine += count;
   }
 
   void previousLine([int count = 1]) {
     cnsl.Console.previousLine(count);
-    _currentLine -= count;
   }
 
   void clearCurrentLine({String text = ''}) {
@@ -138,7 +132,6 @@ class Console {
       }
       cnsl.Console.previousLine(lines);
     }
-    _currentLine += lines;
   }
 
   void overwriteLine([String text = '']) {
@@ -146,22 +139,28 @@ class Console {
   }
 
   void print(String text, [TextStyle style]) {
+    if (style == null) {
+      stdout.writeln(text);
+      return;
+    }
     var lines = wrap(text, style);
-    if (style != null) {
-      if (style.background != null) {
-        cnsl.Console.setBackgroundColor(style.background.index + 1);
-      }
-      if (style.foreground != null) {
-        cnsl.Console.setTextColor(style.foreground.index + 1);
-      }
-      if (style.verticalAlignment != VerticalAlignment.none) {
-        moveToRow(style.verticalAlignment, lines.length);
-      }
+    if (style.background != null) {
+      cnsl.Console.setBackgroundColor(style.background.index + 1);
+    }
+    if (style.foreground != null) {
+      cnsl.Console.setTextColor(style.foreground.index + 1);
+    }
+    int row;
+    if (style.verticalAlignment != VerticalAlignment.none) {
+      row = moveToRow(style.verticalAlignment, lines.length);
+    } else {
+      row = getCursorPosition().row;
     }
     for (var line in lines) {
-      cnsl.Console.moveCursor(column: line.column, row: _currentLine);
+      cnsl.Console.moveCursor(column: line.column, row: row);
+      row++;
       stdout.writeln(line.text);
-      _currentLine++;
+      
     }
     if (style != null) {
       if (style.background != null) {
@@ -171,12 +170,6 @@ class Console {
         cnsl.Console.resetTextColor();
       }
     }
-  }
-
-  void printRaw(String text) {
-    stdout.write(text);
-    var lines = text.split('\n');
-    _currentLine += lines.length;
   }
 
   void write(String text) {
@@ -191,7 +184,6 @@ class Console {
 
   void writeln([String text = '']) {
     stdout.writeln(text);
-    _currentLine++;
   }
 
   void setBold([bool bold = true]) {
@@ -213,6 +205,9 @@ class Console {
 
   T parseListChoice<T>(String text, List<T> options,
       {errorCaseMessage = 'Invalid choice: ', bool errorCaseAddText = true}) {
+    if (text == null) {
+      return null;
+    }
     var index = int.tryParse(text);
     if (index != null && index > 0 && index <= options.length) {
       return options[index - 1];
@@ -239,7 +234,6 @@ class Console {
     cnsl.Console.eraseDisplay(1);
     moveCursor(column: 1, row: 1);
     cnsl.Console.showCursor();
-    _currentLine = 1;
   }
 
   List<TextLine> wrap(String text, TextStyle style, [int terminalColumns]) {
@@ -388,7 +382,6 @@ class Console {
   }
 
   Future<String> readInput(String message, {bool isSecret = false}) {
-    _currentLine++;
     return cnsl.readInput(message, secret: isSecret);
   }
 
